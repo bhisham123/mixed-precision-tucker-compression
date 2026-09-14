@@ -1,15 +1,13 @@
 function T = hosvd1(X,tol,varargin)  
 % HOSVD method 
+% HOSVD method 
  
 % Inputs
 %   X: original tensor (d modes)
-%   r: target rank vector [r1,...,rd]
-%   modes: order of processing the modes/dimensions (list)
+%   tol: desired tolerance
 
 % Outputs
 %   T: Tucker tensor
-%   time : 1×5 vector with timing information:
-%                  [t_core, t_mtt, t_fact,t_rng, t_mat]
 
 
 % Written by Bhisham Dev Verma, 2025

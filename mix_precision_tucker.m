@@ -118,7 +118,7 @@ for  iprec = 1:length(mix_prec_vec)
 
         %compute HOSVD with tol epsilon to get compression; no mixprecision
         Tt = hosvd1(X,epsilon);
-
+        
         err.full(ii) = norm(X-full(Tt))/normX;
 
         mem.Tt.core = prod(size(Tt.core))*bytes(1);
@@ -135,7 +135,7 @@ for  iprec = 1:length(mix_prec_vec)
         %First apply HOSVD with  tolerance  alpha*epsilon to get compressed tucker tensor  
         alpha = 1
         T = hosvd1(X,alpha*epsilon);
-
+        
         normT = norm(T);
         
         err.T(ii) = norm(X -full(T))/normX;
@@ -149,7 +149,7 @@ for  iprec = 1:length(mix_prec_vec)
         %mix precision tolerace
         mixPrecTol = max(epsilon - err.T(ii),(1-alpha)*epsilon);
         disp(['Mix precision tolerance: ' num2str(mixPrecTol)])
-       
+
         % compute partitioning indices
         idx = ones(d, p+1);
 
@@ -157,14 +157,24 @@ for  iprec = 1:length(mix_prec_vec)
         globalTol = (mixPrecTol^2) * normX^2;
         modeBaseTol = globalTol / d;
         
+        Tm = T;
         leftover_mode = 0;   % carry across modes
-
         for j = 1:d
             %mode level budget
             modeTol = modeBaseTol + leftover_mode;
             leftover_mode = 0;
+            
+         
+            M = double(tenmat(T.core,j));
 
-            s = svd(tenmat(T.core,j).data);
+            [~,R] = qr(M',0);
+            [Q{j},S,~] = svd(R','econ');
+            % [Q,s,~] = svd(tenmat(T.core,j).data);
+            Tm.U{j} = Tm.U{j}*Q{j};
+            % Tm.core = ttm(Tm.core,Q,j,'t');
+            clear M;
+
+            s = diag(S);
             squaredSV = s.^2;
 
             idx(j,p+1) = length(s)+1;
@@ -210,6 +220,10 @@ for  iprec = 1:length(mix_prec_vec)
         end
         clear s;
         idx
+
+      
+        Tm.core = ttm(Tm.core,Q,'t');
+        clear Q;
         
 
         ranges = repmat({1:p}, 1, d);
@@ -226,7 +240,6 @@ for  iprec = 1:length(mix_prec_vec)
         clear G;
 
         disp('Only core in Mixed Precision')
-        Tm = T;
         clear T;
 
         core_ent_count = zeros(1,p);
@@ -278,6 +291,7 @@ for  iprec = 1:length(mix_prec_vec)
         
     
         %relative error w.r.t. X 
+        disp('Computing relative error')
         err.coreMP.relX(ii) = norm(X - full(Tm))/normX;
     
         disp(['Relative error: ' num2str(err.coreMP.relX(ii))]);
@@ -343,7 +357,6 @@ for  iprec = 1:length(mix_prec_vec)
         err.coreFactorMP.relX(ii) = norm(X - full(Tm1))/normX;
     
         disp(['Relative error: ' num2str(err.coreFactorMP.relX(ii))]);
-        
  
         mem.Tm1.core = mem.Tm.core; %space taken by mixed precision core
         mem.Tm1.fact = sum(fact_ent_count.*bytes); %space taken by mixed precision factor matrices 
@@ -354,12 +367,9 @@ for  iprec = 1:length(mix_prec_vec)
         ratio.X.coreFactorMP(ii) = mem.X/(mem.Tm1.core + mem.Tm1.fact);
         ratio.Tt.coreFactorMP(ii) = ((mem.Tt.core + mem.Tt.fact))/(mem.Tm1.core + mem.Tm1.fact); %both core and factor matrices in mixed precision (compression improvement factor)
 
-
         disp(['Compression improvement factor: ' num2str(ratio.Tt.coreFactorMP(ii))]);
-        % disp(['nBytes(Tucker(eps/2))/nBytes(CoreMP+FactMP) = ', num2str(ratio.T.coreFactorMP(ii))])  
         disp(' ')
-       
-        clear Tm1
+        
     end
     name = dataset +"_"+num2str(alpha)+"_"+ mix_prec + "_hosvd.mat";
     save(name, 'err', 'ratio', 'eps_vec', 'mix_prec', 'count', 'prec');
